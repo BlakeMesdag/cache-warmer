@@ -6,7 +6,7 @@ import "net/http"
 import "bufio"
 import "os"
 
-func getUrl(url string) {
+func getUrl(url string) (byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Sprintf("Error getting %s: %s", url, err)
@@ -18,7 +18,23 @@ func getUrl(url string) {
 		fmt.Sprintf("Error initialize scanner for %s: %s", url, err)
 	}
 
-	r.ReadByte()
+	return r.ReadByte()
+}
+
+func getUrlBatch(r *bufio.Scanner, size int) ([]string, int) {
+	var batch = make([]string, 0)
+	length := 0
+
+	for length < size {
+		if r.Scan() {
+			batch = append(batch, r.Text())
+		} else {
+			break
+		}
+		length++
+	}
+
+	return batch, length
 }
 
 func main() {
@@ -31,13 +47,13 @@ func main() {
 	if err != nil {
 		fmt.Println("Error opening file: ", err)
 	}
-	defer urlFile.Close()
 
 	scanner := bufio.NewScanner(urlFile)
-	for scanner.Scan() {
-		currUrl := scanner.Text()
-		fmt.Println("Warming cache with url: ", currUrl)
 
-		go getUrl(currUrl)
+	currBatch, length := getUrlBatch(scanner, 2)
+	for i := 0; i < length; i++ {
+		fmt.Println("Warming cache with url: ", currBatch[i])
+		go getUrl(currBatch[i])
 	}
+	defer urlFile.Close()
 }
