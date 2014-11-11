@@ -50,7 +50,7 @@ func SetupScanner(filepath string) (*bufio.Scanner, *os.File) {
 	return scanner, urlFile
 }
 
-func HitUrlsInBatches(s *bufio.Scanner, batchSize int) int {
+func HitUrlsInBatches(s *bufio.Scanner, batchSize int, waitTime time.Duration) int {
 	var wg sync.WaitGroup
 	totalHit := 0
 
@@ -68,9 +68,11 @@ func HitUrlsInBatches(s *bufio.Scanner, batchSize int) int {
 		}
 
 		wg.Wait()
-		time.Sleep(500 * time.Millisecond)
-
 		currBatch, length = GetUrlBatch(s, batchSize)
+
+		if length > 0 {
+			time.Sleep(waitTime)
+		}
 	}
 
 	return totalHit
@@ -78,12 +80,14 @@ func HitUrlsInBatches(s *bufio.Scanner, batchSize int) int {
 
 func main() {
 	urlFilePath := flag.String("file", "urls.csv", "path to file containing urls to warm")
+	waitTime := flag.Duration("waitTime", 500*time.Millisecond, "time between batches of requests")
+	batchSize := flag.Int("batchSize", 2, "number of urls to request in parallel")
 	flag.Parse()
 
 	fmt.Println("Loading urls from: ", *urlFilePath)
 	scanner, urlFile := SetupScanner(*urlFilePath)
 
-	totalHit := HitUrlsInBatches(scanner, 2)
+	totalHit := HitUrlsInBatches(scanner, *batchSize, *waitTime)
 
 	fmt.Sprintln("Warmed cache with %i urls", totalHit)
 
